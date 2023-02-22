@@ -11,6 +11,7 @@ from pathlib import Path
 from collections import OrderedDict
 from datetime import datetime
 
+from threading import Lock
 
 def get_image_path(project_name) -> Path|None:
 	prefix = 'myIcon_'
@@ -30,13 +31,15 @@ class PrjTray:
 
 		self.projects = projects
 
-		self.menu = self.make_menu()
+		self.log_lock = Lock()
+
+		menu = self.make_menu()
 
 		p, wp = self.get_project(default)
 		image = Image.open(p.get_wp_icon(wp))
 		self.fallback_icon = image
 
-		self.tray = pystray.Icon('PRJTRX', image, menu = self.menu)
+		self.tray = pystray.Icon('PRJTRX', image, menu = menu)
 
 		self.change_project(default)
 
@@ -131,24 +134,25 @@ class PrjTray:
 		self.tray.icon = icon
 
 		info = p.get_id(wp)
-		self.log_change(info)
+		self.log(info)
 
 
-	def log_change(self, info):
-		time = datetime.now()
-		time_fmt = time.strftime('%Y-%m-%d %H:%M:%S')
+	def log(self, info, event = 'changed'):
+		with self.log_lock:
+			time = datetime.now()
+			time_fmt = time.strftime('%Y-%m-%d %H:%M:%S')
 
-		log_text = f'{time_fmt} -- changed <{info}>'
+			log_text = f'{time_fmt} -- {event} <{info}>'
 
-		print(log_text)
+			print(log_text)
 
-		with open(self.logfile, 'at') as f:
-			f.write(log_text + '\n')
+			with open(self.logfile, 'at') as f:
+				f.write(log_text + '\n')
 
 
 	def quit(self, trigger = ''):
 		def inner(icon, item):
-			self.log_change(f'QUIT ({trigger})')
+			self.log(f'QUIT ({trigger})', 'event')
 			self.tray.stop()
 
 		return inner
